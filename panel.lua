@@ -41,6 +41,7 @@ end
 function Panel.open()
 	-- by default we display the first subpanel
 	win = vim.api.nvim_open_win(Panel.subpanel_bufs[1], true, { split = "below", height = 15 })
+	vim.w[win].tag = "dapc-ui" -- this is how we identify the Panel window
 	vim.wo[win].foldmethod = "expr"
 	vim.wo[win].foldexpr = "v:lua.fold_fn()"
 	header.show(win, 1)

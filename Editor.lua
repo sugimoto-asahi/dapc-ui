@@ -9,7 +9,7 @@ function Editor:setup()
 		pattern = "DapcEventExecutionPoint",
 		callback = function(args)
 			local data = args.data
-			self:set_current_point(data.path, data.row, data.col)
+			self:set_current_point(data.path, data.row)
 		end,
 	})
 end
@@ -19,8 +19,7 @@ local current_line_id -- extmark id of current line
 --- This will also position the cursor at the execution point.
 --- @param path string Path to file the execution is currently at
 --- @param row number Row number of the current execution point
---- @param col number Column number of the current execution point
-function Editor:set_current_point(path, row, col)
+function Editor:set_current_point(path, row)
 	-- Create a new buffer backing the currently executing file if it doesn't yet exist
 	local bufnr = vim.fn.bufnr(path, true)
 
@@ -43,14 +42,14 @@ function Editor:set_current_point(path, row, col)
 	vim.api.nvim_win_set_buf(winid, bufnr)
 
 	-- position cursor at execution point
-	vim.api.nvim_win_set_cursor(winid, { row, col }) -- hardcoded to first column
+	vim.api.nvim_win_set_cursor(winid, { row, 0 }) -- hardcoded to first column
 
 	-- highlight the execution point
 	local execution_ns = vim.api.nvim_create_namespace("execution")
 	if current_line_id ~= nil then
 		vim.api.nvim_buf_del_extmark(bufnr, execution_ns, current_line_id)
 	end
-	current_line_id = vim.api.nvim_buf_set_extmark(bufnr, execution_ns, row - 1, col - 1, {
+	current_line_id = vim.api.nvim_buf_set_extmark(bufnr, execution_ns, row - 1, 0, {
 		id = row,
 		line_hl_group = "DapcCurrentLine",
 	})

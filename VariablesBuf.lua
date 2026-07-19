@@ -123,7 +123,10 @@ end
 function VariablesBuf:update(data, node_id)
 	-- save the current cursor position in the variables buffer
 	local win = vim.fn.bufwinid(self.buf)
-	local cursor = vim.api.nvim_win_get_cursor(win)
+	local cursor = nil
+	if win ~= -1 then -- panel is not open
+		cursor = vim.api.nvim_win_get_cursor(win)
+	end
 
 	-- do nothing for empty data
 	if not next(data) then
@@ -158,13 +161,15 @@ function VariablesBuf:update(data, node_id)
 	end
 
 	self.tree:render(self.buf, folds)
-	vim.api.nvim_win_set_cursor(win, cursor)
-	vim.api.nvim_win_call(win, function()
-		-- open the fold
-		if vim.fn.foldlevel(cursor[1]) > 0 then
-			vim.cmd("normal! zo")
-		end
-	end)
+	if cursor then
+		vim.api.nvim_win_set_cursor(win, cursor)
+		vim.api.nvim_win_call(win, function()
+			-- open the fold
+			if vim.fn.foldlevel(cursor[1]) > 0 then
+				vim.cmd("normal! zo")
+			end
+		end)
+	end
 end
 
 --- @private

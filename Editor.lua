@@ -1,6 +1,10 @@
 --- UI manager for the editor part (read: anything outside the dapc-ui panel)
+
 --- @class Editor
-local Editor = {}
+--- @field breakpoints table<string, table<number, boolean>>
+local Editor = {
+	breakpoints = {},
+}
 
 --- Setup
 function Editor:setup()
@@ -10,6 +14,30 @@ function Editor:setup()
 		callback = function(args)
 			local data = args.data
 			self:set_current_point(data.path, data.row)
+		end,
+	})
+
+	vim.api.nvim_create_autocmd("User", {
+		pattern = "DapcEventSetBreakpoint",
+		callback = function(args)
+			local data = args.data
+			self:set_breakpoint(data.path, data.row)
+		end,
+	})
+
+	vim.api.nvim_create_autocmd("User", {
+		pattern = "DapcEventUpdateBreakpoint",
+		callback = function(args)
+			local data = args.data
+			self:update_breakpoint(data.path, data.old, data.new)
+		end,
+	})
+
+	vim.api.nvim_create_autocmd("User", {
+		pattern = "DapcEventUnsetBreakpoint",
+		callback = function(args)
+			local data = args.data
+			self:unset_breakpoint(data.path, data.row)
 		end,
 	})
 end
@@ -53,6 +81,50 @@ function Editor:set_current_point(path, row)
 		id = row,
 		line_hl_group = "DapcCurrentLine",
 	})
+end
+
+--- Display a breakpoint
+--- @param path string Absolute path to file where breakpoint is
+--- @param row number Row number of breakpoint
+function Editor:set_breakpoint(path, row)
+	-- vim.print("Request to display breakpoint at: " .. path .. "#" .. row)
+	local breakpoint_ns = vim.api.nvim_create_namespace("breakpoint_ns")
+
+	-- place the breakpoint sign
+	-- set_extmark is 0-indexed for the line number
+	local buf = vim.fn.bufnr(path)
+	vim.api.nvim_buf_set_extmark(buf, breakpoint_ns, row - 1, 0, {
+		sign_text = "●",
+		sign_hl_group = "DapcBreakpointSign",
+		-- we have it so the extmark id matches the (1-indexed) row number
+		-- so we can refer to it easily later on
+		id = row,
+	})
+
+	if not self.breakpoints[path] then
+		self.breakpoints[path] = {}
+	end
+	self.breakpoints[path][row] = true
+end
+
+--- Update a breakpoint
+--- @param path string Absolute path to file where breakpoint is
+--- @param old number Old row number of breakpoint
+--- @param new number New row number of breakpoint
+function Editor:update_breakpoint(path, old, new)
+	self:unset_breakpoint(path, old)
+	self:set_breakpoint(path, new)
+end
+
+--- Unset a breakpoint
+--- @param path string Absolute path to file where breakpoint is
+--- @param row number Row number of breakpoint to unset
+function Editor:unset_breakpoint(path, row)
+	self.breakpoints[path][row] = false
+
+	local breakpoint_ns = vim.api.nvim_create_namespace("breakpoint_ns")
+	local buf = vim.fn.bufnr(path)
+	vim.api.nvim_buf_del_extmark(buf, breakpoint_ns, row)
 end
 
 return Editor

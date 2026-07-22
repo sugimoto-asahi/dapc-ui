@@ -69,6 +69,12 @@ function Editor:set_current_point(path, row)
 	vim.api.nvim_set_current_win(winid)
 	vim.api.nvim_win_set_buf(winid, bufnr)
 
+	-- Now that the buffer is displaying, trigger the filetype detection
+	-- so that syntax highlighting can be applied to it.
+	-- This seems hacky though, but when a new buffer is created
+	-- it doesn't seem to have a filetype set.
+	vim.cmd("filetype detect")
+
 	-- position cursor at execution point
 	vim.api.nvim_win_set_cursor(winid, { row, 0 }) -- hardcoded to first column
 

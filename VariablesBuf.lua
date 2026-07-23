@@ -18,10 +18,17 @@ end
 --- @class RowMapValue
 --- @field table string Name of variable
 
+--- @private
+--- @class dapc-ui.VariablesBuf.NodeData
+--- @field reference number Variable reference of node
+--- @field is_processed boolean True if the variable reference of this node
+--- has already been used in a Variables request
+
 --- @class VariablesBuf
 --- @field buf number Backing buffer
 --- @field tree FoldTree Tree for current suspended state
---- @field node_map table<number, number> Map of node id to variable reference
+--- @field node_map table<number, dapc-ui.VariablesBuf.NodeData> Map of node id
+--- to information about the node
 --- @field row_map table<number, number> Map of row number to node id
 --- representing that variable
 --- @field request_node number Node id the data received
@@ -64,6 +71,9 @@ function VariablesBuf:setup()
 		pattern = "DapcEventVariables",
 		callback = function(args)
 			self:update(args.data, self.request_node)
+			if self.request_node ~= 0 then
+				self.node_map[self.request_node].is_processed = true
+			end
 		end,
 	})
 
@@ -82,12 +92,17 @@ function VariablesBuf:setup()
 	-- Buffer local keymaps
 	vim.keymap.set("n", "zo", function()
 		local target_node_id = self.row_map[vim.api.nvim_win_get_cursor(0)[1]]
+		local node_data = self.node_map[target_node_id]
 
-		-- only send the request if the target node is actually one that has children
-		if self.node_map[target_node_id] then
-			local reference = self.node_map[target_node_id]
+		-- Only send the request if the target node is actually one that has children,
+		-- and if we haven't yet processed this node before
+		if node_data and not node_data.is_processed then
 			self.request_node = target_node_id
-			self:get_variable(reference)
+			self:get_variable(node_data.reference)
+		else
+			-- the node has already been processed before, so there is a
+			-- fold at that local, and we can just open that fold
+			vim.cmd("normal! zo")
 		end
 	end, { buf = VariablesBuf.buf })
 
@@ -148,7 +163,12 @@ function VariablesBuf:update(data, node_id)
 		-- Therefore, we want to take note of the node that represents this variable,
 		-- since we will want to append child nodes to it later on.
 		if var.reference ~= 0 then
-			self.node_map[id] = var.reference
+			--- @type dapc-ui.VariablesBuf.NodeData
+			local value = {
+				reference = var.reference,
+				is_processed = false,
+			}
+			self.node_map[id] = value
 		end
 		self.tree:insert(node_id, node)
 	end

@@ -166,7 +166,7 @@ function VariablesBuf:get_next_id()
 	return id
 end
 
---- Update with new data
+--- Update a node with new data
 --- Only to be used for the start of a new suspended state
 --- @param data any New variables data
 --- @param node_id number Node id to insert all this new data under

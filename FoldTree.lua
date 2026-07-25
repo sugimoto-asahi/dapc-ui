@@ -11,7 +11,7 @@ local highlighter = require("dapc-ui.highlighter")
 --- @field root FoldTreeNode
 --- @field indent string Indent characters for each additional logical depth
 local FoldTree = {
-	indent = "  ",
+	indent = " ",
 }
 
 --- Constructor
@@ -40,6 +40,9 @@ end
 --- @param folds FoldData[] Output to write to
 --- @param level number Current fold level
 --- @param node FoldTreeNode
+--- @note The output array FoldData[] is such that the first element is to
+--- be displayed on the first row, the second element on the second row, etc.
+--- That is, the output array is ordered.
 function FoldTree:get_node(folds, level, node)
 	--- @type FoldData
 	local value = { node_id = node.id, line = node.line, depth = level, fold_level = level }
@@ -88,6 +91,9 @@ function FoldTree:render(buf, folds)
 	for row, data in ipairs(folds) do
 		local indent = string.rep(self.indent, data.depth)
 
+		-- Inserting LINE at row 1 of an empty buffer will result in the
+		-- LINE being at row 1, followed by an empty row (2 rows total)
+		-- However, this "extra row" issue does not occur if the buffer already
 		-- has lines in it, so we have to handle the first row as a special case.
 		if row == 1 then
 			highlighter.replace(buf, row, data.line, indent)

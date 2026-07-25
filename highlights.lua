@@ -20,3 +20,10 @@ vim.api.nvim_set_hl(0, "DapcCurrentLine", {
 vim.api.nvim_set_hl(0, "DapUIHeaderItem", { link = "Winbar" })
 vim.api.nvim_set_hl(0, "DapUIHeaderItemSel", { link = "TabLineSel" })
 vim.api.nvim_set_hl(0, "DapUIUpdatedVariable", { fg = get_highlight("ModeMsg", "fg") })
+
+-- from treesitter-highlight-groups
+vim.api.nvim_set_hl(0, "DapUIVariable", { link = "@variable" })
+
+-- from highlight-groups
+vim.api.nvim_set_hl(0, "DapUIType", { link = "Type" })
+vim.api.nvim_set_hl(0, "DapUIName", { link = "Identifier" })

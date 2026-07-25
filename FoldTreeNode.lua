@@ -1,6 +1,6 @@
 --- @class FoldTreeNode
 --- @field id number Unique identifier
---- @field display string Display string for this node
+--- @field line dapc-ui.Line
 --- @field node_type FoldTreeNodeType
 --- @field child_map table<number, number> node id -> index of node in children
 --- @field children FoldTreeNode[]
@@ -18,11 +18,12 @@ FoldTreeNode.TYPE = {
 
 --- Constructor
 --- @param id number Unique identifier
---- @param display string Display string for this node
+--- @param display dapc-ui.Line Display info for this node
 function FoldTreeNode:new(id, display)
+	--- @type FoldTreeNode
 	local o = {
 		id = id,
-		display = display,
+		line = display,
 		node_type = FoldTreeNode.TYPE.LEAF, -- a new node is always a leaf
 		children = {},
 		child_map = {},

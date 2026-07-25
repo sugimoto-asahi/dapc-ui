@@ -1,10 +1,11 @@
 local FoldTreeNode = require("dapc-ui.FoldTreeNode")
+local highlighter = require("dapc-ui.highlighter")
 
 --- @class FoldData
 --- @field node_id number Node id
 --- @field fold_level number Level of fold
 --- @field depth number Logical depth of fold
---- @field display string Content to display within the fold
+--- @field line dapc-ui.Line
 
 --- @class FoldTree
 --- @field root FoldTreeNode
@@ -16,7 +17,10 @@ local FoldTree = {
 --- Constructor
 function FoldTree:new()
 	-- The root node has an id of 0
-	local root = FoldTreeNode:new(0, "root")
+	--- @type dapc-ui.Line
+	local line = { text = "root", highlights = {} }
+
+	local root = FoldTreeNode:new(0, line)
 	local o = {
 		root = root,
 	}
@@ -38,7 +42,7 @@ end
 --- @param node FoldTreeNode
 function FoldTree:get_node(folds, level, node)
 	--- @type FoldData
-	local value = { node_id = node.id, display = node.display, depth = level, fold_level = level }
+	local value = { node_id = node.id, line = node.line, depth = level, fold_level = level }
 	if node.node_type == FoldTreeNode.TYPE.INNER then
 		value.fold_level = level + 1
 	end
@@ -82,13 +86,13 @@ function FoldTree:render(buf, folds)
 
 	vim.api.nvim_buf_set_lines(buf, 0, -1, false, {}) -- empty the buffer
 	for row, data in ipairs(folds) do
-		row = row - 1 -- we want 0-indexed
+		local indent = string.rep(self.indent, data.depth)
 
-		local line = string.rep(self.indent, data.depth) .. data.display
-		if row == 0 then
-			vim.api.nvim_buf_set_lines(buf, row, row + 1, false, { line })
+		-- has lines in it, so we have to handle the first row as a special case.
+		if row == 1 then
+			highlighter.replace(buf, row, data.line, indent)
 		else
-			vim.api.nvim_buf_set_lines(buf, row, row, false, { line })
+			highlighter.insert(buf, row, data.line, indent)
 		end
 	end
 end

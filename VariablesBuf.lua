@@ -3,14 +3,49 @@ local FoldTreeNode = require("dapc-ui.FoldTreeNode")
 
 --- Variables buffer
 local sep = ": "
+local whitespace = " "
 
---- Construct the text that displays in the buffer for a given variable
+--- Build the display table for a node
 --- @param name string Name of variable
 --- @param value string Value to display
 --- @param var_type? string Type of variable
-local build_line = function(name, value, var_type)
+--- @return dapc-ui.Line
+local function make_display(name, value, var_type)
 	local type_text = var_type or ""
-	local line = type_text .. " " .. name .. sep .. value
+	local line = type_text .. whitespace .. name .. sep .. value
+
+	-- Display format: <type><whitespace><name><sep><value>
+
+	local current = 1
+	--- @type dapc-ui.Line.Highlight
+	local type_hl = {
+		hl_group = "DapUIType",
+		start_col = current,
+		end_col = current + #type_text,
+	}
+	current = current + #type_text + #whitespace
+
+	--- @type dapc-ui.Line.Highlight
+	local name_hl = {
+		hl_group = "DapUIName",
+		start_col = current,
+		end_col = current + #name,
+	}
+	current = current + #name
+
+	--- @type dapc-ui.Line.Highlight
+	local value_hl = {
+		hl_group = "DapUIVariable",
+		start_col = current,
+		end_col = current + #value,
+	}
+	current = current + #value
+
+	--- @type dapc-ui.Line
+	local line = {
+		text = line,
+		highlights = { type_hl, name_hl, value_hl },
+	}
 	return line
 end
 
@@ -147,16 +182,10 @@ function VariablesBuf:update(data, node_id)
 	if not next(data) then
 		return
 	end
-	for index, var in ipairs(data) do
-		local line
-		if var.var_type then
-			line = build_line(var.name, var.value, var.var_type)
-		else
-			line = build_line(var.name, var.value)
-		end
-
+	for _, var in ipairs(data) do
 		local id = self:get_next_id()
-		local node = FoldTreeNode:new(id, line)
+		local display = make_display(var.name, var.value, var.var_type)
+		local node = FoldTreeNode:new(id, display)
 		-- A non-zero reference implies that this variable is not a primitive,
 		-- and is instead some structure with child variables. For example,
 		-- an array variable would have child variables, namely, the array's elements.

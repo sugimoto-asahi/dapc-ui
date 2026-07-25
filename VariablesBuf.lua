@@ -42,11 +42,11 @@ local function make_line(name, value, var_type)
 	current = current + #value
 
 	--- @type dapc-ui.Line
-	local line = {
+	local result = {
 		text = line,
 		highlights = { type_hl, name_hl, value_hl },
 	}
-	return line
+	return result
 end
 
 --- @private

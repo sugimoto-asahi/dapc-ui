@@ -10,7 +10,7 @@ local whitespace = " "
 --- @param value string Value to display
 --- @param var_type? string Type of variable
 --- @return dapc-ui.Line
-local function make_display(name, value, var_type)
+local function make_line(name, value, var_type)
 	local type_text = var_type or ""
 	local line = type_text .. whitespace .. name .. sep .. value
 
@@ -184,7 +184,7 @@ function VariablesBuf:update(data, node_id)
 	end
 	for _, var in ipairs(data) do
 		local id = self:get_next_id()
-		local display = make_display(var.name, var.value, var.var_type)
+		local display = make_line(var.name, var.value, var.var_type)
 		local node = FoldTreeNode:new(id, display)
 		-- A non-zero reference implies that this variable is not a primitive,
 		-- and is instead some structure with child variables. For example,

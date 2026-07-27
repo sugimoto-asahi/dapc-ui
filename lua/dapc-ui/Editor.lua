@@ -96,6 +96,8 @@ function Editor:set_breakpoint(path, row)
 	-- vim.print("Request to display breakpoint at: " .. path .. "#" .. row)
 	local breakpoint_ns = vim.api.nvim_create_namespace("breakpoint_ns")
 
+	-- make sure to display signs
+	vim.opt.signcolumn = "auto"
 	-- place the breakpoint sign
 	-- set_extmark is 0-indexed for the line number
 	local buf = vim.fn.bufnr(path)

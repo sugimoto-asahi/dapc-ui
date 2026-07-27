@@ -3,25 +3,67 @@ local FoldTreeNode = require("dapc-ui.FoldTreeNode")
 
 --- Variables buffer
 local sep = ": "
+local whitespace = " "
 
---- Construct the text that displays in the buffer for a given variable
+--- Build the display table for a node
 --- @param name string Name of variable
 --- @param value string Value to display
 --- @param var_type? string Type of variable
-local build_line = function(name, value, var_type)
+--- @return dapc-ui.Line
+local function make_line(name, value, var_type)
 	local type_text = var_type or ""
-	local line = type_text .. " " .. name .. sep .. value
-	return line
+	local line = type_text .. whitespace .. name .. sep .. value
+
+	-- Display format: <type><whitespace><name><sep><value>
+
+	local current = 1
+	--- @type dapc-ui.Line.Highlight
+	local type_hl = {
+		hl_group = "DapUIType",
+		start_col = current,
+		end_col = current + #type_text,
+	}
+	current = current + #type_text + #whitespace
+
+	--- @type dapc-ui.Line.Highlight
+	local name_hl = {
+		hl_group = "DapUIName",
+		start_col = current,
+		end_col = current + #name,
+	}
+	current = current + #name
+
+	--- @type dapc-ui.Line.Highlight
+	local value_hl = {
+		hl_group = "DapUIVariable",
+		start_col = current,
+		end_col = current + #value,
+	}
+	current = current + #value
+
+	--- @type dapc-ui.Line
+	local result = {
+		text = line,
+		highlights = { type_hl, name_hl, value_hl },
+	}
+	return result
 end
 
 --- @private
 --- @class RowMapValue
 --- @field table string Name of variable
 
+--- @private
+--- @class dapc-ui.VariablesBuf.NodeData
+--- @field reference number Variable reference of node
+--- @field is_processed boolean True if the variable reference of this node
+--- has already been used in a Variables request
+
 --- @class VariablesBuf
 --- @field buf number Backing buffer
 --- @field tree FoldTree Tree for current suspended state
---- @field node_map table<number, number> Map of node id to variable reference
+--- @field node_map table<number, dapc-ui.VariablesBuf.NodeData> Map of node id
+--- to information about the node
 --- @field row_map table<number, number> Map of row number to node id
 --- representing that variable
 --- @field request_node number Node id the data received
@@ -64,6 +106,9 @@ function VariablesBuf:setup()
 		pattern = "DapcEventVariables",
 		callback = function(args)
 			self:update(args.data, self.request_node)
+			if self.request_node ~= 0 then
+				self.node_map[self.request_node].is_processed = true
+			end
 		end,
 	})
 
@@ -82,12 +127,17 @@ function VariablesBuf:setup()
 	-- Buffer local keymaps
 	vim.keymap.set("n", "zo", function()
 		local target_node_id = self.row_map[vim.api.nvim_win_get_cursor(0)[1]]
+		local node_data = self.node_map[target_node_id]
 
-		-- only send the request if the target node is actually one that has children
-		if self.node_map[target_node_id] then
-			local reference = self.node_map[target_node_id]
+		-- Only send the request if the target node is actually one that has children,
+		-- and if we haven't yet processed this node before
+		if node_data and not node_data.is_processed then
 			self.request_node = target_node_id
-			self:get_variable(reference)
+			self:get_variable(node_data.reference)
+		else
+			-- the node has already been processed before, so there is a
+			-- fold at that local, and we can just open that fold
+			vim.cmd("normal! zo")
 		end
 	end, { buf = VariablesBuf.buf })
 
@@ -116,7 +166,7 @@ function VariablesBuf:get_next_id()
 	return id
 end
 
---- Update with new data
+--- Update a node with new data
 --- Only to be used for the start of a new suspended state
 --- @param data any New variables data
 --- @param node_id number Node id to insert all this new data under
@@ -132,23 +182,22 @@ function VariablesBuf:update(data, node_id)
 	if not next(data) then
 		return
 	end
-	for index, var in ipairs(data) do
-		local line
-		if var.var_type then
-			line = build_line(var.name, var.value, var.var_type)
-		else
-			line = build_line(var.name, var.value)
-		end
-
+	for _, var in ipairs(data) do
 		local id = self:get_next_id()
-		local node = FoldTreeNode:new(id, line)
+		local display = make_line(var.name, var.value, var.var_type)
+		local node = FoldTreeNode:new(id, display)
 		-- A non-zero reference implies that this variable is not a primitive,
 		-- and is instead some structure with child variables. For example,
 		-- an array variable would have child variables, namely, the array's elements.
 		-- Therefore, we want to take note of the node that represents this variable,
 		-- since we will want to append child nodes to it later on.
 		if var.reference ~= 0 then
-			self.node_map[id] = var.reference
+			--- @type dapc-ui.VariablesBuf.NodeData
+			local value = {
+				reference = var.reference,
+				is_processed = false,
+			}
+			self.node_map[id] = value
 		end
 		self.tree:insert(node_id, node)
 	end

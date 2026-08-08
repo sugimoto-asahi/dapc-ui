@@ -60,4 +60,19 @@ function FoldTreeNode:insert(id, node)
 	end
 end
 
+--- Update the display text for a node
+--- @param id number Node to update
+--- @param display dapc-ui.Line New display string
+function FoldTreeNode:update_display(id, display)
+	if self.id == id then
+		-- this is the node we want to insert at
+		self.line = display
+	else
+		-- the node we want to insert at is further down the tree,
+		-- so we move towards it
+		local target_node_idx = self.child_map[id]
+		self.children[target_node_idx]:update_display(id, display)
+	end
+end
+
 return FoldTreeNode

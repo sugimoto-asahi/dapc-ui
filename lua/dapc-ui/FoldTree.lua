@@ -36,6 +36,13 @@ function FoldTree:insert(id, node)
 	self.root:insert(id, node)
 end
 
+--- Update the display text for a node
+--- @param id number Node to update
+--- @param display dapc-ui.Line New display string
+function FoldTree:update_display(id, display)
+	self.root:update_display(id, display)
+end
+
 --- Calculate all the folds for a node
 --- @param folds FoldData[] Output to write to
 --- @param level number Current fold level

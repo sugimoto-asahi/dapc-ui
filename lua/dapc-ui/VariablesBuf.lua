@@ -100,8 +100,6 @@ function VariablesBuf:get_variable(reference)
 		pattern = "DapcGetVariable",
 		data = { reference = reference },
 	})
-
-	return self.node_map[reference]
 end
 
 function VariablesBuf:setup()

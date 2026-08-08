@@ -56,8 +56,17 @@ end
 --- @private
 --- @class dapc-ui.VariablesBuf.NodeData
 --- @field reference number Variable reference of node
---- @field is_processed boolean True if the variable reference of this node
---- has already been used in a Variables request
+--- @field value string Current value
+
+--- @private
+--- @alias dapc-ui.VariablesBuf.Context table<string, number>
+--- Map of variable name to node id, in a local context.
+--- This is possible because while the same variable name
+--- may be shared in many places within the same stack frame
+--- (e.g. the name of a variable at function scope scope may be the same as
+--- the name of the member of a struct variable), within the same local context
+--- variable names are unique. An example of a "local context" is the
+--- aforementioned struct; structs cannot have members with the same name.
 
 --- @class VariablesBuf
 --- @field buf number Backing buffer
@@ -66,6 +75,7 @@ end
 --- to information about the node
 --- @field row_map table<number, number> Map of row number to node id
 --- representing that variable
+--- @field contexts table<number, dapc-ui.VariablesBuf.Context> node id -> (var name, node id)
 --- @field request_node number Node id the data received
 --- from the next DapcEventVariables is meant for
 --- @field cursor table<number> Current cursor position in this buffer
@@ -78,11 +88,14 @@ local VariablesBuf = {
 	-- these variables need to be reset each time a new suspended state is reached
 	row_map = {},
 	node_map = {},
+	contexts = {},
 	tree = FoldTree:new(),
 	next_id = 1,
 	request_node = 0, -- always start by inserting at the root node
 	--
 }
+
+VariablesBuf.contexts[0] = {}
 
 --- @private
 --- Request the DAP for the children of a variable
@@ -106,16 +119,13 @@ function VariablesBuf:setup()
 		pattern = "DapcEventVariables",
 		callback = function(args)
 			self:update(args.data, self.request_node)
-			if self.request_node ~= 0 then
-				self.node_map[self.request_node].is_processed = true
-			end
 		end,
 	})
 
 	vim.api.nvim_create_autocmd("User", {
 		pattern = "DapcEventStartState",
 		callback = function(args)
-			self:reset()
+			-- self:reset()
 		end,
 	})
 
@@ -129,15 +139,11 @@ function VariablesBuf:setup()
 		local target_node_id = self.row_map[vim.api.nvim_win_get_cursor(0)[1]]
 		local node_data = self.node_map[target_node_id]
 
-		-- Only send the request if the target node is actually one that has children,
-		-- and if we haven't yet processed this node before
-		if node_data and not node_data.is_processed then
-			self.request_node = target_node_id
+		self.request_node = target_node_id
+		-- Variables requests are only valid for complex variables ,
+		-- and complex variables can be identified by their reference not being 0
+		if node_data.reference ~= 0 then
 			self:get_variable(node_data.reference)
-		else
-			-- the node has already been processed before, so there is a
-			-- fold at that local, and we can just open that fold
-			vim.cmd("normal! zo")
 		end
 	end, { buf = VariablesBuf.buf })
 
@@ -180,26 +186,49 @@ function VariablesBuf:update(data, node_id)
 
 	-- do nothing for empty data
 	if not next(data) then
+		self.request_node = 0
 		return
 	end
 	for _, var in ipairs(data) do
-		local id = self:get_next_id()
-		local display = make_line(var.name, var.value, var.var_type)
-		local node = FoldTreeNode:new(id, display)
-		-- A non-zero reference implies that this variable is not a primitive,
-		-- and is instead some structure with child variables. For example,
-		-- an array variable would have child variables, namely, the array's elements.
-		-- Therefore, we want to take note of the node that represents this variable,
-		-- since we will want to append child nodes to it later on.
-		if var.reference ~= 0 then
+		--- @type dapc-ui.Line
+		local display
+		local target_node
+		if context[var.name] then
+			-- this is not a new variable
+			target_node = context[var.name]
+
 			--- @type dapc-ui.VariablesBuf.NodeData
-			local value = {
-				reference = var.reference,
-				is_processed = false,
-			}
-			self.node_map[id] = value
+			local node_data = self.node_map[target_node]
+
+			if node_data.value ~= var.value then
+				display = make_line(var.name, var.value, var.var_type, true)
+			else
+				display = make_line(var.name, var.value, var.var_type, false)
+			end
+			self.tree:update_display(target_node, display)
+		else
+			-- this is a new variable
+			target_node = self:get_next_id()
+			display = make_line(var.name, var.value, var.var_type, true)
+
+			-- update the context
+			context[var.name] = target_node
+
+			local node = FoldTreeNode:new(target_node, display)
+			self.tree:insert(node_id, node)
 		end
-		self.tree:insert(node_id, node)
+
+		--- @type dapc-ui.VariablesBuf.NodeData
+		local value = {
+			reference = var.reference,
+			value = var.value,
+		}
+		self.node_map[target_node] = value
+
+		-- This is a complex variable, so it needs its own context
+		if var.reference ~= 0 and not self.contexts[target_node] then
+			self.contexts[target_node] = {}
+		end
 	end
 	-- Construct and render the variable tree
 	local folds = self.tree:get()
@@ -219,6 +248,7 @@ function VariablesBuf:update(data, node_id)
 			end
 		end)
 	end
+	self.request_node = 0
 end
 
 --- @private

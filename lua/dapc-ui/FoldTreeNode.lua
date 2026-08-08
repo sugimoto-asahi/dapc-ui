@@ -1,5 +1,6 @@
 --- @class FoldTreeNode
 --- @field id number Unique identifier
+--- @field is_open boolean
 --- @field line dapc-ui.Line
 --- @field node_type FoldTreeNodeType
 --- @field child_map table<number, number> node id -> index of node in children
@@ -23,6 +24,7 @@ function FoldTreeNode:new(id, display)
 	--- @type FoldTreeNode
 	local o = {
 		id = id,
+		is_open = false,
 		line = display,
 		node_type = FoldTreeNode.TYPE.LEAF, -- a new node is always a leaf
 		children = {},
@@ -57,6 +59,46 @@ function FoldTreeNode:insert(id, node)
 		-- being inserted
 		self.child_map[node.id] = id
 		self.children[target_node_idx]:insert(id, node)
+	end
+end
+
+--- Check if a fold node is open
+--- @param id number Node to check
+function FoldTreeNode:get_is_open(id)
+	if self.id == id then
+		return self.is_open
+	else
+		local target_node_idx = self.child_map[id]
+		local target_node = self.children[target_node_idx]
+		return target_node:get_is_open(id)
+	end
+end
+
+--- Open a fold node
+--- @param id number Node to check
+--- @note Does nothing if node has no children (can't be opened)
+function FoldTreeNode:open(id)
+	if self.id == id then
+		if not next(self.children) then
+			self.is_open = true
+		end
+	else
+		local target_node_idx = self.child_map[id]
+		local target_node = self.children[target_node_idx]
+		target_node:open(id)
+	end
+end
+
+--- Close a fold node
+--- @param id number Node to check
+--- @note Does nothing if node has no children (can't be closed)
+function FoldTreeNode:close(id)
+	if self.id == id then
+		self.is_open = false
+	else
+		local target_node_idx = self.child_map[id]
+		local target_node = self.children[target_node_idx]
+		target_node:close(id)
 	end
 end
 

@@ -1,5 +1,6 @@
 local FoldTree = require("dapc-ui.FoldTree")
 local FoldTreeNode = require("dapc-ui.FoldTreeNode")
+local log = require("dapc-ui.log")
 
 --- Variables buffer
 local sep = ": "
@@ -83,7 +84,7 @@ end
 --- @field row_map table<number, number> Map of row number to node id
 --- representing that variable
 --- @field contexts table<number, dapc-ui.VariablesBuf.Context> node id -> (var name, node id)
---- @field request_node number Node id the data received
+--- @field request_nodes number[] Node ids the data received
 --- from the next DapcEventVariables is meant for
 --- @field cursor table<number> Current cursor position in this buffer
 --- @note see https://microsoft.github.io/debug-adapter-protocol/overview
@@ -94,12 +95,14 @@ local VariablesBuf = {}
 --- @private
 --- Request the DAP for the children of a variable
 --- (e.g. elements of a vector variable)
+--- @param id number Node id of variable this request is for
 --- @param reference number Variable reference of the variable we want to query
-function VariablesBuf:get_variable(reference)
+function VariablesBuf:get_variable(id, reference)
 	vim.api.nvim_exec_autocmds("User", {
 		pattern = "DapcGetVariable",
 		data = { reference = reference },
 	})
+	table.insert(self.request_nodes, id)
 end
 
 function VariablesBuf:setup()
@@ -111,7 +114,13 @@ function VariablesBuf:setup()
 	vim.api.nvim_create_autocmd("User", {
 		pattern = "DapcEventVariables",
 		callback = function(args)
-			self:update(args.data, self.request_node)
+			local target = table.remove(self.request_nodes)
+			-- always maintain the first element as 0, we don't want to pop
+			-- the root node
+			if target == 0 then
+				table.insert(self.request_nodes, 0)
+			end
+			self:update(args.data, target)
 		end,
 	})
 
@@ -143,15 +152,33 @@ function VariablesBuf:setup()
 
 	-- Buffer local keymaps
 	vim.keymap.set("n", "zo", function()
-		local target_node_id = self.row_map[vim.api.nvim_win_get_cursor(0)[1]]
+		local row = vim.api.nvim_win_get_cursor(0)[1]
+		local fold_top = vim.fn.foldclosed(row)
+		if fold_top ~= -1 then
+			vim.cmd("normal! zo")
+			row = fold_top
+		end
+		local target_node_id = self.row_map[row]
+		self.tree:open_node(target_node_id)
 		local node_data = self.node_map[target_node_id]
 
-		self.request_node = target_node_id
-		-- Variables requests are only valid for complex variables ,
+		-- Variables requests are only valid for complex variables,
 		-- and complex variables can be identified by their reference not being 0
 		if node_data.reference ~= 0 then
-			self:get_variable(node_data.reference)
+			self:get_variable(target_node_id, node_data.reference)
 		end
+	end, { buf = VariablesBuf.buf })
+
+	vim.keymap.set("n", "zc", function()
+		local row = vim.api.nvim_win_get_cursor(0)[1]
+		local fold_top = vim.fn.foldclosed(row)
+		if fold_top ~= -1 then
+			row = fold_top
+		else
+			vim.cmd("normal! zc")
+		end
+		local target_node_id = self.row_map[row]
+		self.tree:close_node(target_node_id)
 	end, { buf = VariablesBuf.buf })
 
 	return VariablesBuf.buf
@@ -184,6 +211,8 @@ end
 --- @param data any New variables data
 --- @param node_id number Node id to insert all this new data under
 function VariablesBuf:update(data, node_id)
+	vim.log.set_level(log, vim.log.levels.TRACE)
+	log.trace("--UPDATE--")
 	-- save the current cursor position in the variables buffer
 	local win = vim.fn.bufwinid(self.buf)
 	local cursor = nil
@@ -193,9 +222,19 @@ function VariablesBuf:update(data, node_id)
 
 	-- do nothing for empty data
 	if not next(data) then
-		self.request_node = 0
 		return
 	end
+	--- @type dapc-ui.VariablesBuf.Context
+	local context = self.contexts[node_id]
+	log.trace("Incoming data: ")
+	log.trace(data)
+	log.trace("This data is for node: " .. node_id)
+	log.trace("Contexts:")
+	log.trace(self.contexts)
+	log.trace("Node map:")
+	log.trace(self.node_map)
+	log.trace("Row map:")
+	log.trace(self.row_map)
 	for _, var in ipairs(data) do
 		--- @type dapc-ui.Line
 		local display
@@ -232,9 +271,14 @@ function VariablesBuf:update(data, node_id)
 		}
 		self.node_map[target_node] = value
 
-		-- This is a complex variable, so it needs its own context
+		-- If this is a complex variable, so it needs its own context
 		if var.reference ~= 0 and not self.contexts[target_node] then
 			self.contexts[target_node] = {}
+		end
+
+		-- We also want to fetch updates for all variables in open folds.
+		if self.tree:get_is_open(target_node) then
+			self:get_variable(target_node, value.reference)
 		end
 	end
 	-- Construct and render the variable tree
@@ -250,12 +294,11 @@ function VariablesBuf:update(data, node_id)
 		vim.api.nvim_win_set_cursor(win, cursor)
 		vim.api.nvim_win_call(win, function()
 			-- open the fold
-			if vim.fn.foldlevel(cursor[1]) > 0 then
-				vim.cmd("normal! zo")
-			end
+			-- if vim.fn.foldlevel(cursor[1]) > 0 then
+			-- 	vim.cmd("normal! zo")
+			-- end
 		end)
 	end
-	self.request_node = 0
 end
 
 --- @private
@@ -265,9 +308,9 @@ function VariablesBuf:reset()
 	self.node_map = {}
 	self.tree = FoldTree:new()
 	self.next_id = 1
-	self.request_node = 0 -- always start by inserting at the root node
+	self.request_nodes = { 0 } -- always start by inserting at the root node
 	self.contexts = {}
-	self.contexts[0] = {}
+	self.contexts[0] = {} -- prepare a context for the root node
 end
 
 return VariablesBuf

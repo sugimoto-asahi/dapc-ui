@@ -110,4 +110,22 @@ function FoldTree:render(buf, folds)
 	end
 end
 
+--- Check if a fold node is open
+--- @param id number Node to check
+function FoldTree:get_is_open(id)
+	return self.root:get_is_open(id)
+end
+
+--- Open a fold node
+--- @param id number Node to open
+function FoldTree:open_node(id)
+	self.root:open(id)
+end
+
+--- Close a fold node
+--- @param id number Node to close
+function FoldTree:close_node(id)
+	self.root:close(id)
+end
+
 return FoldTree

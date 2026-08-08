@@ -89,20 +89,7 @@ end
 --- @note see https://microsoft.github.io/debug-adapter-protocol/overview
 --- "Lifetime of Objects References" for the reason why the tree should only exist
 --- for the duration of the current suspended state
-local VariablesBuf = {
-	map = {},
-
-	-- these variables need to be reset each time a new suspended state is reached
-	row_map = {},
-	node_map = {},
-	contexts = {},
-	tree = FoldTree:new(),
-	next_id = 1,
-	request_node = 0, -- always start by inserting at the root node
-	--
-}
-
-VariablesBuf.contexts[0] = {}
+local VariablesBuf = {}
 
 --- @private
 --- Request the DAP for the children of a variable
@@ -118,6 +105,7 @@ function VariablesBuf:get_variable(reference)
 end
 
 function VariablesBuf:setup()
+	self:reset()
 	-- Persistent buffer for variables
 	VariablesBuf.buf = vim.api.nvim_create_buf(false, true)
 
@@ -265,7 +253,9 @@ function VariablesBuf:reset()
 	self.node_map = {}
 	self.tree = FoldTree:new()
 	self.next_id = 1
-	self.request_node = 0
+	self.request_node = 0 -- always start by inserting at the root node
+	self.contexts = {}
+	self.contexts[0] = {}
 end
 
 return VariablesBuf

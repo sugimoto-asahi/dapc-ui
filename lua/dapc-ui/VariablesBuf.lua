@@ -116,15 +116,29 @@ function VariablesBuf:setup()
 	})
 
 	vim.api.nvim_create_autocmd("User", {
-		pattern = "DapcEventStartState",
+		pattern = "DapEventStartFrame",
 		callback = function(args)
-			-- self:reset()
+			self:reset()
 		end,
 	})
 
 	vim.api.nvim_create_autocmd("User", {
-		pattern = "DapcEventEndState",
+		pattern = "DapEventEndFrame",
+		callback = function(args)
+			self:reset()
+		end,
+	})
+
+	vim.api.nvim_create_autocmd("User", {
+		pattern = "DapcEventStartState",
 		callback = function(args) end,
+	})
+
+	vim.api.nvim_create_autocmd("User", {
+		pattern = "DapcEventEndState",
+		callback = function(args)
+			self:reset()
+		end,
 	})
 
 	-- Buffer local keymaps

@@ -245,7 +245,7 @@ function VariablesBuf:update(data, node_id)
 end
 
 --- @private
---- Reset state to prepare for a new suspended state
+--- Reset / init state to prepare for a new suspended state
 function VariablesBuf:reset()
 	self.row_map = {}
 	self.node_map = {}

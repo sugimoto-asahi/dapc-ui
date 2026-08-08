@@ -4,14 +4,17 @@ local FoldTreeNode = require("dapc-ui.FoldTreeNode")
 --- Variables buffer
 local sep = ": "
 local whitespace = " "
+local update_sign = ""
 
 --- Build the display table for a node
 --- @param name string Name of variable
 --- @param value string Value to display
 --- @param var_type? string Type of variable
+--- @param is_updated? boolean
 --- @return dapc-ui.Line
-local function make_line(name, value, var_type)
+local function make_line(name, value, var_type, is_updated)
 	local type_text = var_type or ""
+	local is_updated = is_updated or false
 	local line = type_text .. whitespace .. name .. sep .. value
 
 	-- Display format: <type><whitespace><name><sep><value>
@@ -46,6 +49,10 @@ local function make_line(name, value, var_type)
 		text = line,
 		highlights = { type_hl, name_hl, value_hl },
 	}
+	if is_updated then
+		result.sign = update_sign
+	end
+
 	return result
 end
 

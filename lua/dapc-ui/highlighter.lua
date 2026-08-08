@@ -22,6 +22,7 @@ local M = {}
 --- @class dapc-ui.Line
 --- @field text string Display string for this node
 --- @field highlights dapc-ui.Line.Highlight[]
+--- @field sign string? Sign text
 
 --- Replace a line in a buffer with a Line
 --- @param buf number Target buffer
@@ -40,6 +41,11 @@ function M.replace(buf, row, line, indent)
 			invalidate = true,
 			undo_restore = false,
 		})
+		if line.sign then
+			vim.api.nvim_buf_set_extmark(buf, ns, row - 1, 0, {
+				sign_text = line.sign,
+			})
+		end
 	end
 end
 
@@ -62,6 +68,11 @@ function M.insert(buf, row, line, indent)
 			invalidate = true,
 			undo_restore = false,
 		})
+		if line.sign then
+			vim.api.nvim_buf_set_extmark(buf, ns, row - 1, 0, {
+				sign_text = line.sign,
+			})
+		end
 	end
 end
 
